@@ -13,8 +13,17 @@ from TeamSPBackend.git.views import construct_url
 
 @require_http_methods(['GET'])
 def get_git_individual_commits(request, space_key):
+    """
+    get individual commit status
+    input: request
+           space_key - the project's space_key
+    output: json response with all individual commit to github space details 
+    """
     data = []
     if StudentCommitCounts.objects.filter(space_key=space_key).exists():
+        # if StudentCommitCounts object has the project data then
+        # a temp json with student name and student's commit count
+        # is created as response from the StudentCommitCounts.objects 
         for item in StudentCommitCounts.objects.filter(space_key=space_key):
             temp = {
                 "student": str(item.student_name),
@@ -23,6 +32,10 @@ def get_git_individual_commits(request, space_key):
             data.append(temp)
     else:
         if ProjectCoordinatorRelation.objects.filter(space_key=space_key).exists():
+            # otherwise check for project data in ProjectCoordinatorRelation, if details related to project exist 
+            # then, first an updated individual commits from the database is fetched
+            # then, a temp json with student name and student's commit count
+            # is created as response from the StudentCommitCounts.objects 
             update_individual_commits()
             temp = {}
             for item in StudentCommitCounts.objects.filter(space_key=space_key):
@@ -32,6 +45,7 @@ def get_git_individual_commits(request, space_key):
                 }
                 data.append(temp)
         else:
+            # otherwise, the request is invalid, return error
             resp = init_http_response_my_enum(RespCode.invalid_parameter)
             return make_json_response(resp=resp)
 
