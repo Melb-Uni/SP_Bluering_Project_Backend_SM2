@@ -1,0 +1,5 @@
+
+.idea
+__pycache__/
+TeamSPBackend/settings/dev.py
+TeamSPBackend/settings/prod.py
