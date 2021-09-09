@@ -59,20 +59,24 @@ def get_git_commits(request, space_key):
         # get it from git web (the first crawler)
         coordinator_id = request.session['coordinator_id']
         if ProjectCoordinatorRelation.objects.filter(space_key=space_key, coordinator_id=coordinator_id).exists():
-            relation_data = ProjectCoordinatorRelation.objects.filter(space_key=space_key, coordinator_id=coordinator_id)[0]
+            relation_data = ProjectCoordinatorRelation.objects.filter(
+                space_key=space_key, coordinator_id=coordinator_id)[0]
             git_dto = construct_url(relation_data)
             if not git_dto.valid_url:
                 resp = init_http_response_my_enum(RespCode.no_repository)
                 return make_json_response(resp=resp)
-            commits = get_commits(relation_data.git_url, space_key, None, None, None, None)
+            commits = get_commits(relation_data.git_url,
+                                  space_key, None, None, None, None)
             if commits is None:
-                resp = init_http_response_my_enum(RespCode.invalid_authentication)
+                resp = init_http_response_my_enum(
+                    RespCode.invalid_authentication)
                 return make_json_response(resp=resp)
             if commits == -1:
                 resp = init_http_response_my_enum(RespCode.user_not_found)
                 return make_json_response(resp=resp)
             if commits == -2:
-                resp = init_http_response_my_enum(RespCode.git_config_not_found)
+                resp = init_http_response_my_enum(
+                    RespCode.git_config_not_found)
                 return make_json_response(resp=resp)
 
             delta_commit_count = {}  # To store every day commit count
@@ -138,7 +142,6 @@ def get_git_commits(request, space_key):
             #     )
             #     git_data.save()
 
-
         # Case 3: Neither contains, invalid space_key, return None
         else:
             resp = init_http_response_my_enum(RespCode.invalid_parameter)
@@ -159,7 +162,8 @@ def get_git_pr(request, body, *args, **kwargs):
         return make_json_response(resp=resp)
     git_dto.url = git_dto.url.lstrip('$')
 
-    commits = get_pull_request(git_dto.url, git_dto.author, git_dto.branch, git_dto.second_after, git_dto.second_before)
+    commits = get_pull_request(git_dto.url, git_dto.author,
+                               git_dto.branch, git_dto.second_after, git_dto.second_before)
     total = len(commits)
     author = set()
     for commit in commits:
@@ -176,21 +180,29 @@ def get_git_pr(request, body, *args, **kwargs):
 
 @require_http_methods(['GET'])
 def get_git_metrics(request, space_key):
+
     # Case 1: if git_metrics table contains this space_key, get it directly from db
     if GitMetrics.objects.filter(space_key=space_key).exists():
         metrics_data = GitMetrics.objects.filter(space_key=space_key)[0]
+
     # Case 2: if git_metrics table does not contain this space_key, get it using get_metrics()
     else:
+        # Doubt: How coordinator_id is present in session ?
         coordinator_id = request.session['coordinator_id']
+
         if ProjectCoordinatorRelation.objects.filter(space_key=space_key, coordinator_id=coordinator_id).exists():
-            relation_data = ProjectCoordinatorRelation.objects.filter(space_key=space_key, coordinator_id=coordinator_id)[0]
+            # Fetching Git details from ProjectCoordinatorRelation table
+            relation_data = ProjectCoordinatorRelation.objects.filter(
+                space_key=space_key, coordinator_id=coordinator_id)[0]
             get_metrics(relation_data)
             if GitMetrics.objects.filter(space_key=space_key).exists():
-                metrics_data = GitMetrics.objects.filter(space_key=space_key)[0]
+                metrics_data = GitMetrics.objects.filter(
+                    space_key=space_key)[0]
             else:
                 resp = init_http_response_my_enum(RespCode.invalid_parameter)
                 return make_json_response(resp=resp)
-            # Case 3: if space_key is invalid, return None
+
+        # Case 3: if space_key is invalid, return None
         else:
             resp = init_http_response_my_enum(RespCode.invalid_parameter)
             return make_json_response(resp=resp)
