@@ -2,13 +2,14 @@
 import time
 from django.views.decorators.http import require_http_methods
 from TeamSPBackend.git.views import update_individual_commits, get_metrics
-from TeamSPBackend.common.github_util import get_commits, get_pull_request, get_und_metrics
+from TeamSPBackend.common.github_util import get_commits, get_pull_request, get_und_metrics, getBranches, getCommitsForBranch
 from TeamSPBackend.api.dto.dto import GitDTO
 from TeamSPBackend.common.choices import RespCode
 from TeamSPBackend.common.utils import make_json_response, body_extract, init_http_response_my_enum, transformTimestamp
 from TeamSPBackend.git.models import StudentCommitCounts, GitCommitCounts, GitMetrics
 from TeamSPBackend.project.models import ProjectCoordinatorRelation
 from TeamSPBackend.git.views import construct_url
+from collections import defaultdict
 
 
 @require_http_methods(['GET'])
@@ -151,7 +152,47 @@ def get_git_commits(request, space_key):
     return make_json_response(resp=resp)
 
 
+@require_http_methods(['GET'])
+def get_git_individual_contribution(request, space_key):
+    coordinator_id = request.session['coordinator_id']
+    if ProjectCoordinatorRelation.objects.filter(space_key=space_key, coordinator_id=coordinator_id).exists():
+        relation_data = ProjectCoordinatorRelation.objects.filter(
+            space_key=space_key, coordinator_id=coordinator_id)[0]
+        git_dto = construct_url(relation_data)
+        if not git_dto.valid_url:
+            resp = init_http_response_my_enum(RespCode.no_repository)
+            return make_json_response(resp=resp)
+
+        branches = getBranches(relation_data.git_url, space_key)
+
+        '''
+        Gets commits for each individual from all the branches
+        '''
+        individualContributions = defaultdict(set)
+
+        # Iterate through branches and fetch the commits
+        for branch in branches:
+            commitsForBranch = getCommitsForBranch(
+                branch["name"], relation_data.git_url, space_key)
+
+            for commit in commitsForBranch:
+                # Adds commits to the author
+                individualContributions[commit["commit"]
+                                        ["author"]["name"]].add(commit['sha'])
+
+        response = defaultdict(int)
+        for key, value in individualContributions.items():
+            response[key] = len(value)
+        resp = init_http_response_my_enum(
+            RespCode.success, response)
+        return make_json_response(resp=resp)
+    else:
+        resp = init_http_response_my_enum(RespCode.invalid_parameter)
+        return make_json_response(resp=resp)
+
 # pull request
+
+
 @require_http_methods(['POST'])
 def get_git_pr(request, body, *args, **kwargs):
     git_dto = GitDTO()
