@@ -92,7 +92,7 @@ urlpatterns = [
 
     # new
     path('jira/<team>/ticket_count', jira.get_ticket_count_from_db),
-    path('jira/<team>/contributions', jira.get_contributions_from_db),
+    path('jira/<team>/contributions', jira.get_contributions_project),
     path('git/config', jira.setGithubJiraUrl),
 
 
