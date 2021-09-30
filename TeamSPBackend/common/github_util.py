@@ -6,12 +6,17 @@ import re
 import sys
 import time
 
+import requests
+
 from TeamSPBackend.settings.base_setting import BASE_DIR
 from TeamSPBackend.project.models import ProjectCoordinatorRelation
 
 logger = logging.getLogger('django')
 
 GITHUB = 'https://github.com/'
+GITHUB_API_BASE_URL = 'https://api.github.com/'
+GITHUB_API_REPOS_URL = GITHUB_API_BASE_URL + 'repos'
+
 REPO_PATH = BASE_DIR + '/resource/repo/'
 COMMIT_DIR = BASE_DIR + '/resource/commit_log'
 
@@ -39,7 +44,8 @@ os.system(UND_LICENSE)
 UND_METRICS = UND_PATH + 'und create -db {} -languages python C++ Java add {} {} analyze'
 
 # Using Python API for get metrics
-GET_METRICS_PY_PATH = os.path.dirname(os.path.abspath(__file__)) + '/get_und_metrics.py'
+GET_METRICS_PY_PATH = os.path.dirname(
+    os.path.abspath(__file__)) + '/get_und_metrics.py'
 GET_METRICS_PY = 'python3 ' + GET_METRICS_PY_PATH + ' {} {}'
 # storage metrics.json
 METRICS_FILE_PATH = BASE_DIR + '/resource/understand/'
@@ -56,6 +62,19 @@ def construct_certification(repo, space_key):
     if len(username) == 0 or len(password) == 0:
         return -2  # -2 means there doesn't exist git username and pwd
     return repo[0:8] + username + ':' + password + '@' + repo[8:]
+
+
+def getAuthInfo(space_key):
+    # filter null username and password
+    user_info = ProjectCoordinatorRelation.objects.filter(space_key=space_key).exclude(
+        git_username__isnull=True, git_password__isnull=True)
+    if len(user_info) == 0:
+        return -1  # -1 means there is no user data
+    username = user_info[0].git_username  # 'chengzsh3'
+    password = user_info[0].git_password  # Personal Access Token
+    if len(username) == 0 or len(password) == 0:
+        return -2  # -2 means there doesn't exist git username and pwd
+    return {"username": username, "password": password}
 
 
 def init_git():
@@ -79,8 +98,10 @@ def process_changed(changed):
     delete_pattern = re.findall('\d+ delet', changed)
 
     file = 0 if not file_pattern else int(file_pattern[0].strip(' file'))
-    insert = 0 if not insert_pattern else int(insert_pattern[0].strip(' insert'))
-    delete = 0 if not delete_pattern else int(delete_pattern[0].strip(' delet'))
+    insert = 0 if not insert_pattern else int(
+        insert_pattern[0].strip(' insert'))
+    delete = 0 if not delete_pattern else int(
+        delete_pattern[0].strip(' delet'))
     return file, insert, delete
 
 
@@ -149,6 +170,53 @@ def get_commits(repo, space_key, author=None, branch=None, after=None, before=No
     return commits
 
 
+def extractInfoFromRepo(repoURL):
+    repoParts = repoURL.split('/')
+    owner = repoParts[3]
+    repo = repoParts[4]
+
+    return {'owner': owner, 'repo': repo}
+
+
+def getBranches(repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    r = requests.get(
+        f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/branches",
+        auth=(username, password))
+    response = json.loads(r.text)
+    return response
+
+
+def getCommitsForBranch(branch, repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    r = requests.get(
+        f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/commits?sha={branch}",
+        auth=(username, password))
+
+    response = json.loads(r.text)
+    return response
+
+
 def get_pull_request(repo, author=None, branch=None, after=None, before=None):
     pull_repo(repo)
 
@@ -207,12 +275,14 @@ def get_und_metrics(repo, space_key):
     st_time = time.time()
     # Get .und , add files and analyze them
     und_metrics = UND_METRICS.format(und_file, path, und_file)
-    logger.info('[Understand] File {} Executing: {}'.format(und_file, und_metrics))
+    logger.info('[Understand] File {} Executing: {}'.format(
+        und_file, und_metrics))
     os.system(und_metrics)
 
     # Get metrics.json by using another .py script
     get_metrics_by_py = GET_METRICS_PY.format(und_file, metrics_file)
-    logger.info('[Understand Python API Get Metrics] get_metrics_by_py: {} '.format(get_metrics_by_py))
+    logger.info('[Understand Python API Get Metrics] get_metrics_by_py: {} '.format(
+        get_metrics_by_py))
     os.system(get_metrics_by_py)
 
     metrics_file = METRICS_FILE_PATH + metrics_file
@@ -221,7 +291,8 @@ def get_und_metrics(repo, space_key):
     metrics = tmp_dict
     end_time = time.time()
     cost_time = round(end_time - st_time, 2)
-    logger.info('[Understand] File {} Get Metrics: {} , cost : {} seconds'.format(und_file, metrics, cost_time))
+    logger.info('[Understand] File {} Get Metrics: {} , cost : {} seconds'.format(
+        und_file, metrics, cost_time))
     return metrics
 
 # if __name__ == '__main__':

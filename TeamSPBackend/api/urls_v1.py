@@ -10,13 +10,13 @@ from .views.account import account_router, login, logout, update_account, delete
 from .views.subject import subject_router, update_subject, delete_subject
 from .views.team import team_router, get_team_members, team_member_configure, team_configure
 from .views.slack import get_team_data, get_all_member_data, get_member_data
-from TeamSPBackend.api.views.project.project import import_project,login_sso
-from .views.git import get_git_commits, get_git_pr, get_git_individual_commits, get_git_metrics
+from TeamSPBackend.api.views.project.project import import_project, login_sso
+from .views.git import get_git_commits, get_git_individual_contribution, get_git_pr, get_git_individual_commits, get_git_metrics
 
 
 urlpatterns = [
     # Project Related API
-    path('project/import',import_project),
+    path('project/import', import_project),
     path('project/delete', confluence.delete_project),
 
     # Invitation Related API
@@ -52,6 +52,8 @@ urlpatterns = [
     # Git Related API
     path('git/<space_key>/commit_count', get_git_commits),
     path('git/individual_commits/<space_key>', get_git_individual_commits),
+    path('git/contribution/<space_key>', get_git_individual_contribution),
+    # Product Quality Metrics data
     path('git/metrics/<space_key>', get_git_metrics),
     path('git/pullrequest', get_git_pr),
 
@@ -70,11 +72,13 @@ urlpatterns = [
          confluence.get_subject_supervisors),
     # COMP90082 21 S1 sprint1
     path('confluence/spaces/<key_word>', confluence.get_spaces_by_key),
-    path('confluence/<space_key>/meeting_minutes', confluence.get_meeting_minutes),
+    path('confluence/<space_key>/meeting_minutes',
+         confluence.get_meeting_minutes),
 
     path('confluence/imported_projects', confluence.get_imported_project),
 
-    path('confluence/spaces/<space_key>/page_count', confluence.get_page_count_by_time),
+    path('confluence/spaces/<space_key>/page_count',
+         confluence.get_page_count_by_time),
 
     path('sso/login', login_sso),
 
@@ -88,7 +92,7 @@ urlpatterns = [
 
     # new
     path('jira/<team>/ticket_count', jira.get_ticket_count_from_db),
-    path('jira/<team>/contributions', jira.get_contributions_from_db),
+    path('jira/<team>/contributions', jira.get_contributions_project),
     path('git/config', jira.setGithubJiraUrl),
 
 
@@ -103,5 +107,3 @@ urlpatterns = [
     path('slack/<int:id>/member', get_all_member_data),
     path('slack/<int:team_id>/member/<int:student_id>', get_member_data),
 ]
-
-

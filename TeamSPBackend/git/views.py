@@ -10,7 +10,8 @@ from TeamSPBackend.common.choices import RespCode
 from TeamSPBackend.common.utils import make_json_response, check_user_login, body_extract, check_body, \
     init_http_response_my_enum
 from TeamSPBackend.project.models import ProjectCoordinatorRelation
-import time, datetime
+import time
+import datetime
 from TeamSPBackend.common.utils import transformTimestamp
 
 
@@ -51,7 +52,8 @@ def update_individual_commits():
             if StudentCommitCounts.objects.filter(student_name=str(key)).exists():
                 user = StudentCommitCounts.objects.get(student_name=str(key))
                 if str(value) != user.commit_counts:
-                    StudentCommitCounts.objects.filter(student_name=str(key)).update(commit_counts=str(value))
+                    StudentCommitCounts.objects.filter(
+                        student_name=str(key)).update(commit_counts=str(value))
             else:
                 user = StudentCommitCounts(student_name=str(key), commit_counts=str(value),
                                            space_key=relation.space_key)
@@ -74,7 +76,8 @@ def auto_update_commits(space_key):
     if space_key is not None:
         if not GitCommitCounts.objects.filter(space_key=space_key).exists():
             if ProjectCoordinatorRelation.objects.filter(space_key=space_key).exclude(git_url__isnull=True).exists():
-                relation = ProjectCoordinatorRelation.objects.filter(space_key=space_key).exclude(git_url__isnull=True)[0]
+                relation = ProjectCoordinatorRelation.objects.filter(
+                    space_key=space_key).exclude(git_url__isnull=True)[0]
                 git_dto = construct_url(relation)
                 if not git_dto.valid_url:
                     return
@@ -167,14 +170,19 @@ def get_metrics(relation):
     }
     # create GitDTO object
     git_dto = GitDTO()
-    # extract body information and store them in GitDTO.
+
+    # extract body information and store them in GitDTO().
     body_extract(data, git_dto)
+
+    # The body_extract function adds valid_url and url params to git_dto's object
     if not git_dto.valid_url:
         resp = init_http_response_my_enum(RespCode.no_repository)
         return make_json_response(resp=resp)
     git_dto.url = git_dto.url.lstrip('$')
 
     metrics = get_und_metrics(git_dto.url, relation.space_key)
+
+    # If there's some error in metrics
     if metrics is None:
         resp = init_http_response_my_enum(RespCode.invalid_authentication)
         return make_json_response(resp=resp)
