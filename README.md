@@ -7,7 +7,7 @@ It provides REST apis for students activities data on Confluence, Jira, and Git.
 
 **require python3.7 or higher and MySQL**
 
-1. Installing all packages needed `pip install -r requirements.txt` (if python2 and python3 are both installed, use pip3 and python3)
+1. Installin all packages needed `pip install -r requirements.txt` (if python2 and python3 are both installed, use pip3 and python3)
 2. start MySQL server on localhost:3306, and create a database named "sp90013" `CREATE DATABASE sp90013`
 3. modify the MySQL username and password config in TeamSPBackend/Settings/dev.py and TeamSPBackend/Settings/prod.py (don't forget to modify 'DATABASES/default/TEST/PASSWORD' in prod.py)
 4. create MySQL tables `python manage.py migrate`
