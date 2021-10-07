@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('meeting_title', models.CharField(max_length=256)),
                 ('meeting_link', models.TextField()),
+                ('meeting_sprint', models.CharField(max_length=256)),
                 ('space_key', models.CharField(max_length=256)),
             ],
             options={

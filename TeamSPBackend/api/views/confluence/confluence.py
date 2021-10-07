@@ -363,7 +363,8 @@ def get_meeting_minutes(request, space_key):
         for meeting in meeting_minutes:
             data.append({
                 'title': meeting.meeting_title,
-                'link': meeting.meeting_link
+                'link': meeting.meeting_link,
+                'sprint': meeting.meeting_sprint
             })
         resp = init_http_response(
         RespCode.success.value.key, RespCode.success.value.msg)
