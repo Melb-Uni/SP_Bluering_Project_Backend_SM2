@@ -217,6 +217,26 @@ def getCommitsForBranch(branch, repo, spacekey):
     return response
 
 
+def getWeeklyCommits(repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    r = requests.get(
+        f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/stats/commit_activity",
+        auth=(username, password))
+
+    response = json.loads(r.text)
+    return response
+
+
 def get_pull_request(repo, author=None, branch=None, after=None, before=None):
     pull_repo(repo)
 
