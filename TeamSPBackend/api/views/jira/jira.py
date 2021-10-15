@@ -45,13 +45,12 @@ def session_interpreter(request):
 def jira_login(request):
     """ Handles Jira login"""
     # username, password = session_interpreter(request)
-    username = atl_username
-    password = atl_password
-    jira = Jira(
-        url='https://jira.cis.unimelb.edu.au:8444',
-        username=username,
-        password=password,
-        # verify_ssl=False # not required with ssl mitigation
+    jira = JIRA(
+        options={
+                'server': 'https://jira.cis.unimelb.edu.au:8444',
+                'verify': False
+            },
+            basic_auth=(atl_username, atl_password)
     )
     return jira
 
@@ -513,26 +512,61 @@ def setGithubJiraUrl(request):
             RespCode.success.value.key, RespCode.success.value.msg)
         return HttpResponse(json.dumps(resp), content_type="application/json")
 
+# def getBoardId():
+#     url = 'https://jira.cis.unimelb.edu.au:8444/rest/agile/1.0/board?projectKeyOrId=DA9001319'
+#     headers = {'Authorization': 'Basic', 'username': atl_username, 'password': atl_password,'content-type': 'application/json', 'Accept-Charset': 'UTF-8'}
+#     r = requests.get(url, headers=headers)
+#     print(r)
 
-@require_http_methods(['GET'])
+
+
+# @require_http_methods(['GET'])
 def get_ticket_count_from_db(request, team):
     try:
+        jira = jira_login(request)
         coordinator_id = request.session.get('coordinator_id')
         existRecord = list(
             ProjectCoordinatorRelation.objects.filter(coordinator_id=coordinator_id, space_key=team).values(
                 'jira_project'))
         url = key_extracter(existRecord[0])
         jira_url = url.get('jira_project')
-
-        ticketCountRecord = list(
-            JiraCountByTime.objects.filter(space_key=jira_url).values('time', 'to_do', 'in_progress', 'done'))
-        resp = init_http_response(
-            RespCode.success.value.key, RespCode.success.value.msg)
-        resp['data'] = ticketCountRecord
-        return HttpResponse(json.dumps(resp), content_type="application/json")
-    except Exception:
+        size = 100
+        initial = 0
+        cap = jira_url.capitalize()
+        while True:
+            start= initial*size
+            issues = jira.search_issues('project='+jira_url, start, size)
+            if len(issues) == 0:
+                break
+            initial += 1
+            for issue in issues:
+                print('ticket-no=',issue)
+                print('IssueType=',issue.fields.issuetype.name)
+                print('Status=',issue.fields.status.name)
+                print('Summary=',issue.fields.summary)
+    except Exception as e:
+        print(e)
         resp = {'code': -1, 'msg': 'error'}
         return HttpResponse(json.dumps(resp), content_type="application/json")
+
+# def get_ticket_count_from_db(request, team):
+#     try:
+#         coordinator_id = request.session.get('coordinator_id')
+#         existRecord = list(
+#             ProjectCoordinatorRelation.objects.filter(coordinator_id=coordinator_id, space_key=team).values(
+#                 'jira_project'))
+#         url = key_extracter(existRecord[0])
+#         jira_url = url.get('jira_project')
+
+#         ticketCountRecord = list(
+#             JiraCountByTime.objects.filter(space_key=jira_url).values('time', 'to_do', 'in_progress', 'done'))
+#         resp = init_http_response(
+#             RespCode.success.value.key, RespCode.success.value.msg)
+#         resp['data'] = ticketCountRecord
+#         return HttpResponse(json.dumps(resp), content_type="application/json")
+#     except Exception:
+#         resp = {'code': -1, 'msg': 'error'}
+#         return HttpResponse(json.dumps(resp), content_type="application/json")
 
 
 def get_all_url_from_db():
