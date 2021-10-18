@@ -7,6 +7,9 @@ import sys
 import time
 
 import requests
+import zipfile
+import io
+import shutil
 
 from TeamSPBackend.settings.base_setting import BASE_DIR
 from TeamSPBackend.project.models import ProjectCoordinatorRelation
@@ -215,6 +218,87 @@ def getCommitsForBranch(branch, repo, spacekey):
 
     response = json.loads(r.text)
     return response
+
+
+def getTreeForBranch(branch, repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    r = requests.get(
+        f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/git/trees/{branch}?recursive=1",
+        auth=(username, password))
+
+    response = json.loads(r.text)["tree"]
+
+    return response
+
+
+def deleteRepo():
+    dirpath = "./repos"
+    if os.path.exists(dirpath) and os.path.isdir(dirpath):
+        shutil.rmtree(dirpath)
+
+
+def getTreeNode(node):
+    return {
+        "id": node,
+        "name": node,
+        "children": []
+    }
+
+
+def getTreeView(file_name):
+    res = getTreeNode(file_name)
+
+    for root, dirs, files in os.walk(f"./repos/{file_name}", topdown=False):
+        for name in files:
+            # print(os.path.join(root, name))
+            res["children"].append({
+                "id": name,
+                "name": name,
+                "children": []
+            })
+        for name in dirs:
+            # print(os.path.join(root, name))
+            res["children"].append({
+                "id": name,
+                "name": name,
+                "children": []
+            })
+
+    return res
+
+
+def extractAndLoadRepo(repo):
+    z = zipfile.ZipFile(io.BytesIO(repo.content))
+    z.extractall("./repos")
+    return next(os.walk('./repos'))[1][0]
+
+
+def getRepoAsTreeView(repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    url = f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/zipball"
+    r = requests.get(url, auth=(username, password))
+    file_name = extractAndLoadRepo(r)
+    return getTreeView(file_name)
 
 
 def getWeeklyCommits(repo, spacekey):
