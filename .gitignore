@@ -2,6 +2,8 @@
 TeamSPBackend/settings/dev.py
 TeamSPBackend/settings/prod.py
 
+/repos
+
 # Django #
 *.log
 *.pot
