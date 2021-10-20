@@ -1,5 +1,7 @@
 from django.apps import AppConfig
-from atlassian import Jira
+from itertools import groupby
+# from atlassian import Jira
+from jira import JIRA
 import json
 import time
 import datetime
@@ -8,7 +10,7 @@ import re
 import csv
 import logging
 
-from math import ceil
+from math import ceil, floor
 from django.views.decorators.http import require_http_methods
 from django.http.response import HttpResponse
 from django.core.exceptions import ObjectDoesNotExist
@@ -31,6 +33,7 @@ from TeamSPBackend.project.models import ProjectCoordinatorRelation
 from TeamSPBackend.coordinator.models import Coordinator
 from TeamSPBackend.api.config import atl_username, atl_password
 from TeamSPBackend.git.views import auto_update_commits
+from collections import Counter
 
 
 # helper functions
@@ -520,7 +523,7 @@ def setGithubJiraUrl(request):
 
 
 
-# @require_http_methods(['GET'])
+@require_http_methods(['GET'])
 def get_ticket_count_from_db(request, team):
     try:
         jira = jira_login(request)
@@ -532,18 +535,46 @@ def get_ticket_count_from_db(request, team):
         jira_url = url.get('jira_project')
         size = 100
         initial = 0
-        cap = jira_url.capitalize()
-        while True:
-            start= initial*size
-            issues = jira.search_issues('project='+jira_url, start, size)
-            if len(issues) == 0:
-                break
-            initial += 1
+        data = {'all':[],'count':{'all':[]}}
+        # while True:
+        start= initial*size
+        issues = []
+        result = jira.search_issues('project='+jira_url, start, size, json_result=True)
+        total = result['total']
+        issues = result['issues']
+        for i in range(floor(total / 100)):  # recurring query if count > 100
+            start = 0 + (i + 1) * 100
+            issues += jira.search_issues('project='+jira_url, start, size, json_result=True)['issues']
+    
+        # jira.search_issues('project='+jira_url, start, size)
+        if len(issues) != 0:
+        # initial += 1
             for issue in issues:
-                print('ticket-no=',issue)
-                print('IssueType=',issue.fields.issuetype.name)
-                print('Status=',issue.fields.status.name)
-                print('Summary=',issue.fields.summary)
+                # print('ticket-no=',issue)
+                # print('issuetype=',issue['fields']['issuetype']['name'])
+                # print('created=',issue['fields']['created'])
+                dt = datetime.datetime.strptime(issue['fields']['created'].split('+')[0], '%Y-%m-%dT%H:%M:%S.%f')
+                data['all'].append({'id':issue['id'], 'created':dt.date().strftime("%Y-%m-%d"), 'status':issue['fields']['status']['name'] })
+
+            for k,v in groupby(data['all'],key=lambda x:x['status']):
+                k = ("".join(k.split(' '))).lower()
+                data[k]=list(v)
+                data['count'][k] = []
+            for k,v in groupby(data['all'],key=lambda x:x['created']):
+                data['count']['all'].append({'date':k,'total':len(list(v))})
+            for k,v in groupby(data['todo'],key=lambda x:x['created']):
+                data['count']['todo'].append({'date':k,'total':len(list(v))})
+            for k,v in groupby(data['inreview'],key=lambda x:x['created']):
+                data['count']['inreview'].append({'date':k,'total':len(list(v))})
+            for k,v in groupby(data['inprogress'],key=lambda x:x['created']):
+                data['count']['inprogress'].append({'date':k,'total':len(list(v))})
+            for k,v in groupby(data['done'],key=lambda x:x['created']):
+                data['count']['done'].append({'date':k,'total':len(list(v))})
+                
+        resp = init_http_response(
+            RespCode.success.value.key, RespCode.success.value.msg)
+        resp['data'] = data
+        return HttpResponse(json.dumps(resp), content_type="application/json")
     except Exception as e:
         print(e)
         resp = {'code': -1, 'msg': 'error'}
