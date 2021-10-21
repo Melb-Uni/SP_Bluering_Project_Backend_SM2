@@ -54,7 +54,8 @@ def update_space_user_list(space_key):
         for contribution in IndividualConfluenceContribution.objects.filter(space_key=space_key):
             if contribution.user_id not in user_set:
                 try:
-                    user_info = conf.get_user_details_by_username(contribution.user_id)
+                    user_info = conf.get_user_details_by_username(
+                        contribution.user_id)
                 except atlassian.errors.ApiNotFoundError as e:
                     logger = logging.getLogger('django')
                     logger.error(str(e) + " " + contribution.user_id)
@@ -87,7 +88,8 @@ def update_user_list():
 
 def get_user(user, space_key):
     logger = logging.getLogger('django')
-    logger.info('insert user ' + user['username'] + ' in the space ' + space_key)
+    logger.info('insert user ' +
+                user['username'] + ' in the space ' + space_key)
     picture_path = "profile_picture/"
     import re
     url = requests.get("http://txt.go.sohu.com/ip/soip")
@@ -97,8 +99,8 @@ def get_user(user, space_key):
         picture_path += "default.svg"
     else:
         picture_path += user["username"]
-        download("https://confluence.cis.unimelb.edu.au:8443" + user["profilePicture"]["path"],
-                 settings.MEDIA_ROOT + picture_path)
+        # download("https://confluence.cis.unimelb.edu.au:8443" + user["profilePicture"]["path"],
+        #          settings.MEDIA_ROOT + picture_path)
     u = UserList(user_id=user["username"],
                  user_name=user["displayName"],
                  email=user["username"] + "@student.unimelb.edu.au",
@@ -108,7 +110,8 @@ def get_user(user, space_key):
 
 
 def download(url, file_path):
-    r2 = requests.get(url, auth=(config.atl_username, config.atl_password), verify=False)
+    r2 = requests.get(url, auth=(config.atl_username,
+                      config.atl_password), verify=False)
     with open(file_path, 'wb') as file:
         file.write(r2.content)
 
@@ -132,7 +135,8 @@ def update_meeting_minutes():
     for coordinator in Coordinator.objects.all():
         # select each project which coordinator can see
         for project in ProjectCoordinatorRelation.objects.filter(coordinator_id=coordinator.id):
-            all_pages = confluence.get_all_pages_from_space(project.space_key, start=0, limit=999999)
+            all_pages = confluence.get_all_pages_from_space(
+                project.space_key, start=0, limit=999999)
             # get all the meeting pages exclude the parent page
             for page in all_pages:
                 page_id = page['id']
@@ -174,6 +178,7 @@ def insert_space_meeting(space_key):
                                           space_key=space_key)
                     meet.save()
 
+
 def insert_space_page_history(space_key):
     page_history = update_space_page_history(space_key)
     with transaction.atomic():
@@ -183,8 +188,10 @@ def insert_space_page_history(space_key):
 
 def update_space_page_history(space_key):
     history_data = []
-    conf = confluence.log_into_confluence(config.atl_username, config.atl_password)
-    contents = conf.get_space_content(space_key=space_key, content_type="page", expand="history")
+    conf = confluence.log_into_confluence(
+        config.atl_username, config.atl_password)
+    contents = conf.get_space_content(
+        space_key=space_key, content_type="page", expand="history")
     results = contents["results"]
     # while there exists incoming results, keep getting space contents
     while contents["size"] == contents["limit"]:
@@ -200,7 +207,8 @@ def update_space_page_history(space_key):
         # from timestamp: take date, ignore time, while keep the time zone
         time_str = time_str[:11]+"00:00:00.001"+time_str[-6:]
         # convert timestamp string to unix timestamp
-        page_create_time = int(time.mktime(datetime.fromisoformat(time_str).timetuple()))
+        page_create_time = int(time.mktime(
+            datetime.fromisoformat(time_str).timetuple()))
         if page_create_time in delta_page_count:
             delta_page_count[page_create_time] += 1
         else:
@@ -216,7 +224,8 @@ def update_space_page_history(space_key):
     for day in range(days[0], cur_time, 60*60*24):
         if day in delta_page_count:
             page_count += delta_page_count[day]
-        history = PageHistory(date=day, page_count=page_count, space_key=space_key)
+        history = PageHistory(
+            date=day, page_count=page_count, space_key=space_key)
         history_data.append(history)
     return history_data
 
@@ -277,7 +286,8 @@ def update_space_page_contribution(space_key):
 def insert_space_page_contribution(space_key):
     page_contribution = update_space_page_contribution(space_key)
     with transaction.atomic():
-        IndividualConfluenceContribution.objects.filter(space_key=space_key).delete()
+        IndividualConfluenceContribution.objects.filter(
+            space_key=space_key).delete()
         IndividualConfluenceContribution.objects.bulk_create(page_contribution)
 
 
@@ -298,7 +308,8 @@ def get_spaces():
     return spaces
 
 
-utils.start_schedule(update_meeting_minutes, 60 * 60 * 24)  # update meeting minutes on a daily basis
+# update meeting minutes on a daily basis
+utils.start_schedule(update_meeting_minutes, 60 * 60 * 24)
 utils.start_schedule(update_page_history, 60 * 60 * 24)
-utils.start_schedule(update_user_list, 60 * 60 * 24)  # update page contributions and user list on a daily basis
-
+# update page contributions and user list on a daily basis
+utils.start_schedule(update_user_list, 60 * 60 * 24)
