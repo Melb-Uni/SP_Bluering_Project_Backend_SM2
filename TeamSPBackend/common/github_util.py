@@ -10,6 +10,9 @@ import requests
 import zipfile
 import io
 import shutil
+from pygount import SourceAnalysis
+from os import listdir
+from os.path import isfile, join
 
 from TeamSPBackend.settings.base_setting import BASE_DIR
 from TeamSPBackend.project.models import ProjectCoordinatorRelation
@@ -241,6 +244,18 @@ def getTreeForBranch(branch, repo, spacekey):
     return response
 
 
+def getPyGountMetrics(path):
+
+    res = SourceAnalysis.from_file(path, "pygount")
+    metrics = {
+        "lineCount": res.code_count,
+        "commentCount": res.documentation_count,
+        "emptyLineCount": res.empty_count
+    }
+
+    return metrics
+
+
 def deleteRepo():
     dirpath = "./repos"
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
@@ -251,30 +266,43 @@ def getTreeNode(node):
     return {
         "id": node,
         "name": node,
-        "children": []
+        "children": [],
+        "metrics": {
+            "lineCount": 0,
+            "commentCount": 0,
+            "emptyLineCount": 0
+        }
     }
 
 
 def getTreeView(file_name):
-    res = getTreeNode(file_name)
 
-    for root, dirs, files in os.walk(f"./repos/{file_name}", topdown=False):
-        for name in files:
-            # print(os.path.join(root, name))
-            res["children"].append({
-                "id": name,
-                "name": name,
-                "children": []
-            })
-        for name in dirs:
-            # print(os.path.join(root, name))
-            res["children"].append({
-                "id": name,
-                "name": name,
-                "children": []
-            })
+    cumulativeChildren = []
+    cumulativeMetrics = {
+        "lineCount": 0,
+        "commentCount": 0,
+        "emptyLineCount": 0
+    }
 
-    return res
+    path = f"./repos/{file_name}"
+
+    for f in listdir(path):
+
+        children, metric = ([], getPyGountMetrics(
+            f"./repos/{file_name}/{f}")) if isfile(join(path, f)) else getTreeView(f"{file_name}/{f}")
+
+        cumulativeMetrics["lineCount"] += metric["lineCount"]
+        cumulativeMetrics["commentCount"] += metric["commentCount"]
+        cumulativeMetrics["emptyLineCount"] += metric["emptyLineCount"]
+
+        cumulativeChildren.append({
+            "id": f,
+            "name": f,
+            "children": children,
+            "metrics": metric
+        })
+
+    return cumulativeChildren, cumulativeMetrics
 
 
 def extractAndLoadRepo(repo):
@@ -295,10 +323,61 @@ def getRepoAsTreeView(repo, spacekey):
     username = authInfo['username']
     password = authInfo['password']
 
+    deleteRepo()
     url = f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/zipball"
     r = requests.get(url, auth=(username, password))
     file_name = extractAndLoadRepo(r)
-    return getTreeView(file_name)
+
+    res = getTreeNode(file_name)
+    res["children"], res["metrics"] = getTreeView(file_name)
+
+    return res
+
+
+def getCodeModifications(repo, spacekey):
+    authInfo = getAuthInfo(spacekey)
+    if authInfo == -1 or authInfo == -2:
+        return authInfo
+
+    # repoInfo contains owner and repo info
+    repoInfo = extractInfoFromRepo(repo)
+    owner = repoInfo['owner']
+    repository = repoInfo['repo']
+    username = authInfo['username']
+    password = authInfo['password']
+
+    url = f"{GITHUB_API_REPOS_URL}/{owner}/{repository}/stats/contributors"
+    r = requests.get(url, auth=(username, password))
+
+    response = json.loads(r.text)
+
+    contributions = {
+        "authors": {},
+        "totalModifs": 0
+    }
+
+    for item in response:
+        author = item["author"]["login"]
+
+        contributions["authors"][author] = 0
+
+        for d in item["weeks"]:
+            contributions["authors"][author] += d["a"] + d["d"]
+
+        contributions["totalModifs"] += contributions["authors"][author]
+
+    res = {}
+
+    for author, c in contributions["authors"].items():
+        url = f"https://api.github.com/users/{author}"
+
+        payload = {}
+        headers = {}
+
+        r = requests.request("GET", url, headers=headers, data=payload)
+        response = json.loads(r.text)
+        res[response["name"]] = (c/contributions["totalModifs"])*100
+    return res
 
 
 def getWeeklyCommits(repo, spacekey):
