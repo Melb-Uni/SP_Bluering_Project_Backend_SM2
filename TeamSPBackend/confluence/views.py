@@ -146,12 +146,9 @@ def update_meeting_minutes():
                     # each meeting minutes url
                     page_link = 'https://confluence.cis.unimelb.edu.au:8443/' + page_link_webui
                     if 'meeting' in page_title_lower:
-                        sprint_position = page_link_webui.lower().find("sprint")
-                        page_sprint = page_link_webui[sprint_position:sprint_position+8]
-                        page_sprint = page_sprint.replace("+"," ")
                         # it is not in the DB before
                         if len(MeetingMinutes.objects.filter(meeting_title=page_title)) == 0:
-                            meet = MeetingMinutes(meeting_title=page_title, meeting_link=page_link,meeting_sprint=page_sprint,
+                            meet = MeetingMinutes(meeting_title=page_title, meeting_link=page_link,
                                                   space_key=project.space_key)
                             meet.save()
 
@@ -301,7 +298,7 @@ def get_spaces():
     return spaces
 
 
-utils.start_schedule(update_meeting_minutes, 1)  # update meeting minutes on a daily basis
+utils.start_schedule(update_meeting_minutes, 60 * 60 * 24)  # update meeting minutes on a daily basis
 utils.start_schedule(update_page_history, 60 * 60 * 24)
 utils.start_schedule(update_user_list, 60 * 60 * 24)  # update page contributions and user list on a daily basis
 

@@ -6,7 +6,6 @@ from django.db import models
 class MeetingMinutes(models.Model):
     meeting_title = models.CharField(max_length=256)
     meeting_link = models.TextField()
-    meeting_sprint = models.CharField(max_length=256, default = "Not Defined")
     space_key = models.CharField(max_length=256)
 
     class Meta:
